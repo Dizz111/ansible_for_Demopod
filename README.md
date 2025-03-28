@@ -1,6 +1,7 @@
 # Ansible and Vmware 8.0
 
 Repository for demoPod scripting for Test Drives
+
 Based on pyvmomi=8.0.3.0.1,  ansible [core 2.18.4], python version = 3.12.3
 
 Install virtualenv , Ansible and pyVmomi. ssh keys are assumed set up on control host /laptop
