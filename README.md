@@ -49,3 +49,9 @@ you also need to make sure community.vmware collection is installed
 ansible-galaxy collection install community.vmware - if not installed
 
 ansible-galaxy collection list - to verify it is installed
+
+# Vsphere 
+Not required but It is best to create ansible service user with dedicated role. You can also use administrator@vsphere.local or whatever 
+
+account, but It’s a good practice to create separate accounts for different systems.
+
