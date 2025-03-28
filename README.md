@@ -25,7 +25,9 @@ deactivate - exits the virtual env
 If you need to install ansible you can use pip if you need pip install it by running this command
 
 sudo apt update
+
 sudo apt install python3-pip
+
 pip3 --version
 
 # ansible
@@ -37,10 +39,12 @@ sudo pip install ansible or sudo apt install ansible
 We also need to install pyVmomi which is the Python SDK for the VMware vSphere API that allows you to manage ESX, ESXi, and vCenter.
 
 pip3 install PyVmomi
+
 pip show pyvmomi
 
 # community.vmware
 you also need to make sure community.vmware collection is installed 
 
 ansible-galaxy collection install community.vmware - if not installed
+
 ansible-galaxy collection list - to verify it is installed
