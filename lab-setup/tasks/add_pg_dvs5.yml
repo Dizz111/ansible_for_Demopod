@@ -1,0 +1,49 @@
+---
+- name: Add Port Groups and PVLANs to vSphere Distributed Switch
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    vds_name: "ansible-vds"  # Replace with your VDS name
+    vcenter_hostname: "10.9.20.75"  # REPLACE with actual vCenter hostname
+    vcenter_user: "administrator@penlabs.net"  # REPLACE with correct user
+    port_groups:
+      - name: "Web_PortGroup"
+        vlan_id: 10
+        port_binding: "static"
+      - name: "App_PortGroup"
+        vlan_id: 20
+        port_binding: "static"
+      - name: "DB_PortGroup"
+        vlan_id: 30
+        port_binding: "static"
+
+  tasks:
+    - name: Debug vCenter Credentials
+      debug:
+        msg: "Connecting to vCenter at {{ vcenter_hostname }} with user {{ vcenter_user }}"
+
+    - name: Add Port Groups to Distributed Switch
+      community.vmware.vmware_dvs_portgroup:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: "{{ validate_certs | default(false) }}"
+        switch_name: "{{ vds_name }}"
+        portgroup_name: "{{ item.name }}"
+        vlan_id: "{{ item.vlan_id }}"
+        port_binding: "{{ item.port_binding }}"
+        state: present
+      loop: "{{ port_groups }}"
+      delegate_to: localhost
+
+  vars_prompt:
+    - name: vcenter_password
+      prompt: "Enter vCenter Password"
+      private: true
+
+    - name: validate_certs
+      prompt: "Validate vCenter Certificates? (true/false)"
+      private: false
+      default: false
+

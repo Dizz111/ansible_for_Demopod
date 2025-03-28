@@ -1,0 +1,65 @@
+---
+- name: Configure PVLANs and Port Groups on vSphere Distributed Switch
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    vcenter_hostname: "your-vcenter-hostname"  # Replace with actual vCenter hostname/IP
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "your_password"
+    validate_certs: false
+    vds_name: "Your-VDS-Name"  # Replace with your Distributed Switch name
+    primary_pvlan_id: 100
+    secondary_pvlans:
+      - secondary_pvlan_id: 101
+        pvlan_type: "isolated"
+      - secondary_pvlan_id: 102
+        pvlan_type: "community"
+    port_groups:
+      - name: "PVLAN_Promiscuous"
+        vlan_id: 100
+        vlan_private: true
+        port_binding: "static"
+      - name: "PVLAN_Isolated_101"
+        vlan_id: 101
+        vlan_private: true
+        pvlan_primary_id: 100
+        pvlan_type: "isolated"
+        port_binding: "static"
+      - name: "PVLAN_Community_102"
+        vlan_id: 102
+        vlan_private: true
+        pvlan_primary_id: 100
+        pvlan_type: "community"
+        port_binding: "static"
+
+  tasks:
+    - name: Configure Primary and Secondary PVLANs on the Distributed Switch
+      community.vmware.vmware_dvswitch_pvlans:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: "{{ validate_certs }}"
+        switch_name: "{{ vds_name }}"
+        primary_pvlans:
+          - primary_pvlan_id: "{{ primary_pvlan_id }}"
+            secondary_pvlans: "{{ secondary_pvlans }}"
+      delegate_to: localhost
+
+    - name: Create PVLAN Port Groups on the Distributed Switch
+      community.vmware.vmware_dvs_portgroup:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: "{{ validate_certs }}"
+        switch_name: "{{ vds_name }}"  # Ensure correct parameter name
+        portgroup_name: "{{ item.name }}"
+        vlan_id: "{{ item.vlan_id }}"
+        vlan_private: "{{ item.vlan_private }}"
+        port_binding: "{{ item.port_binding | default('static') }}"
+        pvlan_primary_id: "{{ item.pvlan_primary_id | default(omit) }}"
+        pvlan_type: "{{ item.pvlan_type | default(omit) }}"
+        state: present
+      loop: "{{ port_groups }}"
+      delegate_to: localhost
+
