@@ -10,10 +10,15 @@ it is best to run this from a **virtual environment** - this can be set up like 
 
 # virtualenv
 sudo apt install python3-venv
+
 python3 -m venv xxx
+
 source xxx/bin/activate
+
 *where xxx = the name you want it to be 
+
 source xxx/bin/activate - puts you in that Virtual env xxx 
+
 deactivate - exits the virtual env
 
 # pip
