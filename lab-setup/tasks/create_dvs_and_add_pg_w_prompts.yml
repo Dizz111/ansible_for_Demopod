@@ -21,7 +21,7 @@
       private: false
 
     - name: vds_name
-      prompt: "Enter Distributed Switch Name (e.g., ansible-vds)"
+      prompt: "Enter Distributed Switch Name (e.g., ansible-dvs)"
       private: false
 
     - name: validate_certs

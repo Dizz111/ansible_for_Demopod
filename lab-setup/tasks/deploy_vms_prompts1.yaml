@@ -1,0 +1,116 @@
+---
+- name: Prompted Deployment of VMs from Template
+  hosts: localhost
+  gather_facts: no
+  vars_prompt:
+    - name: "vcenter_server"
+      prompt: "Enter vCenter server IP or hostname"
+      private: no
+
+    - name: "vcenter_user"
+      prompt: "Enter vCenter username"
+      private: no
+
+    - name: "vcenter_pass"
+      prompt: "Enter vCenter password"
+      private: yes
+
+    - name: "datacenter_name"
+      prompt: "Enter datacenter name"
+      private: no
+
+    - name: "esxi_hostname"
+      prompt: "Enter target ESXi host"
+      private: no
+
+    - name: "template_name"
+      prompt: "Enter the name of the VM template"
+      private: no
+
+    - name: "vm_folder"
+      prompt: "Enter the relative VM folder path (e.g. vm/ansible-vm or leave empty for root)"
+      private: no
+      default: ""
+
+    - name: "datastore"
+      prompt: "Enter datastore name"
+      private: no
+
+    - name: "network_name"
+      prompt: "Enter port group name"
+      private: no
+
+    - name: "num_vms"
+      prompt: "Enter number of VMs to deploy"
+      private: no
+
+    - name: "vm_base_name"
+      prompt: "Enter base name for the VMs (e.g. web)"
+      private: no
+
+    - name: "base_ip"
+      prompt: "Enter base IP (e.g. 10.29.95.160)"
+      private: no
+
+  vars:
+    vm_list: "{{ lookup('sequence', 'start=1 end=' + num_vms|string, wantlist=True) | map('int') | list }}"
+
+  tasks:
+    - name: "Generate full VM configurations"
+      set_fact:
+        vm_configs: >-
+          {{
+            vm_list | map('int') | map('extract', {
+              item: {
+                'name': vm_base_name ~ '%02d' | format(item),
+                'hostname': vm_base_name ~ '%02d' | format(item),
+                'ip': base_ip.split('.')[:-1] | join('.') ~ '.' ~ (base_ip.split('.')[-1] | int + item - 1) | string
+              }
+              for item in vm_list
+            }) | list
+          }}
+
+    - name: "List available folders (for confirmation)"
+      community.vmware.vmware_folder_info:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        datacenter: "{{ datacenter_name }}"
+        validate_certs: false
+      register: folder_info
+      delegate_to: localhost
+
+    - name: "Show available folders"
+      debug:
+        msg: "{{ folder_info.folders | map(attribute='path') | list }}"
+
+    - name: "Deploy VMs from template"
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: false
+        name: "{{ item.name }}"
+        template: "{{ template_name }}"
+        datacenter: "{{ datacenter_name }}"
+        folder: "{{ vm_folder | default(omit) }}"
+        esxi_hostname: "{{ esxi_hostname }}"
+        datastore: "{{ datastore }}"
+        networks:
+          - name: "{{ network_name }}"
+            ip: "{{ item.ip }}"
+            netmask: 255.255.252.0
+            gateway: 10.9.23.254
+            type: static
+            dns_servers:
+              - 8.8.8.8
+        customization:
+          hostname: "{{ item.hostname }}"
+          dns_servers:
+            - 8.8.8.8
+            - 10.9.20.7
+        state: poweredon
+        wait_for_ip_address: yes
+      loop: "{{ vm_configs }}"
+      delegate_to: localhost
+
