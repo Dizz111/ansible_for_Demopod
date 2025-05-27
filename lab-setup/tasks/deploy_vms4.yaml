@@ -8,8 +8,8 @@
     vcenter_pass: "Pensando0$"
     datacenter_name: "pod10-vcsa"
     esxi_hostname: "10.9.23.217"
-    template_name: "TinyLinuxBash-temp"
-    vm_folder: "vm/ansible-vm"  # ✅ This folder must exist in vCenter
+    template_name: "ubu-linux-template-16gb"
+    vm_folder: "vm/ansible-vm"  # This folder must exist under your chosen dataCenter in vCenter
     datastore: "datastore-217-2"
     network_name: "pod10-dvs-pvlan-2095"
 

@@ -1,0 +1,49 @@
+---
+- name: Safely remove multiple VMs from vSphere
+  hosts: localhost
+  gather_facts: no
+  vars:
+    vcenter_server: "10.9.20.75"
+    vcenter_user: "administrator@penlabs.net"
+    vcenter_pass: "Pensando0$"
+    datacenter_name: "pod10-vcsa"
+    vm_list:
+      - name: web02
+      - name: web03
+
+  tasks:
+    - name: Check if VM exists
+      community.vmware.vmware_guest_info:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: false
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ item.name }}"
+      register: vm_info
+      ignore_errors: yes
+      delegate_to: localhost
+      loop: "{{ vm_list }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Debug vm_info results
+      debug:
+        var: vm_info.results
+
+    - name: Delete VM if exists
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: false
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ item.item.name }}"
+        state: absent
+        force: yes
+      when: (item.failed is not defined or item.failed == false) and (item.instance is defined)
+      loop: "{{ vm_info.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      delegate_to: localhost
+

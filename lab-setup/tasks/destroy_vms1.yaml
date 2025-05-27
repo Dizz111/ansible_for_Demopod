@@ -1,0 +1,27 @@
+---
+- name: Remove multiple VMs from vSphere
+  hosts: localhost
+  gather_facts: no
+  vars:
+    vcenter_server: "10.9.20.75"
+    vcenter_user: "administrator@penlabs.net"
+    vcenter_pass: "Pensando0$"
+    datacenter_name: "pod10-vcsa"
+    vm_list:
+      - name: web02
+      - name: web03
+
+  tasks:
+    - name: Delete VMs from vCenter
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: false
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ item.name }}"
+        state: absent
+        force: yes
+      loop: "{{ vm_list }}"
+      delegate_to: localhost
+
