@@ -1,5 +1,5 @@
 ---
-- name: Safely remove multiple VMs from vSphere
+- name: Safely delete VMs from vSphere with confirmation
   hosts: localhost
   gather_facts: no
   vars:
@@ -7,31 +7,38 @@
     vcenter_user: "administrator@penlabs.net"
     vcenter_pass: "Pensando0$"
     datacenter_name: "pod10-vcsa"
+
     vm_list:
       - name: web02
       - name: web03
 
   tasks:
-    - name: Check if VM exists
+    - name: Prompt before deletion
+      pause:
+        prompt: "Do you really want to delete all listed VMs? Type 'yes' to proceed"
+      register: delete_prompt
+
+    - name: Check user confirmation
+      fail:
+        msg: "VM deletion cancelled by user."
+      when: delete_prompt.user_input | lower != 'yes'
+
+    - name: Check if each VM exists
       community.vmware.vmware_guest_info:
         hostname: "{{ vcenter_server }}"
         username: "{{ vcenter_user }}"
         password: "{{ vcenter_pass }}"
-        validate_certs: false
         datacenter: "{{ datacenter_name }}"
         name: "{{ item.name }}"
+        validate_certs: false
       register: vm_info
-      ignore_errors: yes
-      delegate_to: localhost
       loop: "{{ vm_list }}"
       loop_control:
         label: "{{ item.name }}"
+      ignore_errors: yes
+      delegate_to: localhost
 
-    - name: Debug vm_info results
-      debug:
-        var: vm_info.results
-
-    - name: Delete VM if exists
+    - name: Delete VMs only if they exist
       community.vmware.vmware_guest:
         hostname: "{{ vcenter_server }}"
         username: "{{ vcenter_user }}"
