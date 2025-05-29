@@ -1,0 +1,69 @@
+---
+- name: Deploy multiple VMs from template on vSphere
+  hosts: localhost
+  gather_facts: no
+  vars:
+    vcenter_server: "10.9.20.75"
+    vcenter_user: "administrator@penlabs.net"
+    vcenter_pass: "Pensando0$"
+    datacenter_name: "pod10-vcsa"
+    esxi_hostname: "10.9.23.217"
+    template_name: "ubu-linux-template-16gb"
+    vm_folder: "vm/ansible-vm"  # This folder must exist under your chosen dataCenter in vCenter
+    datastore: "datastore-217-2"
+    network_name: "pod10-dvs-pvlan-2095"
+
+    vm_list:
+      - name: test01
+        ip: 10.29.95.160
+        hostname: test01
+      - name: test02
+        ip: 10.29.95.161
+        hostname: test02
+
+  tasks:
+    - name: "OPTIONAL: Debug - List all VM folders"
+      community.vmware.vmware_folder_info:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        datacenter: "{{ datacenter_name }}"
+        validate_certs: false
+      register: folder_info
+      delegate_to: localhost
+
+    - name: "Debug folder list (optional)"
+      debug:
+        var: folder_info
+      when: folder_info is defined
+
+    - name: "Deploy VMs from template"
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: false
+        name: "{{ item.name }}"
+        template: "{{ template_name }}"
+        datacenter: "{{ datacenter_name }}"
+        folder: "{{ vm_folder }}"
+        esxi_hostname: "{{ esxi_hostname }}"
+        datastore: "{{ datastore }}"
+        networks:
+          - name: "{{ network_name }}"
+            ip: "{{ item.ip }}"
+            netmask: 255.255.252.0
+            gateway: 10.9.23.254
+            type: static
+            dns_servers:
+              - 8.8.8.8
+        customization:
+          hostname: "{{ item.hostname }}"
+          dns_servers:
+            - 8.8.8.8
+            - 10.9.20.7
+        state: poweredon
+        wait_for_ip_address: yes
+      loop: "{{ vm_list }}"
+      delegate_to: localhost
+
