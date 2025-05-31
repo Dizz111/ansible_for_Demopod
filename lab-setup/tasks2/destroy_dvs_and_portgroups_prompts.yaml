@@ -1,0 +1,94 @@
+---
+- name: Delete vSphere Distributed Switch and Port Groups
+  hosts: localhost
+  gather_facts: no
+
+  vars_prompt:
+    - name: vcenter_hostname
+      prompt: "Enter vCenter Hostname (e.g., 10.9.20.75)"
+      private: false
+
+    - name: vcenter_username
+      prompt: "Enter vCenter Username (e.g., administrator@vsphere.local)"
+      private: false
+
+    - name: vcenter_password
+      prompt: "Enter vCenter Password"
+      private: true
+
+    - name: datacenter_name
+      prompt: "Enter Datacenter Name (e.g., pod10-vcsa)"
+      private: false
+
+    - name: vds_name
+      prompt: "Enter Distributed Switch Name to delete (e.g., ansible-dvs)"
+      private: false
+
+    - name: validate_certs
+      prompt: "Validate vCenter Certificates? (true/false)"
+      private: false
+      default: false
+
+    - name: confirm_delete
+      prompt: "Are you sure you want to DELETE the distributed switch and port groups? (yes/no)"
+      private: false
+
+  vars:
+    port_groups:
+      - name: "Web_PortGroup"
+        vlan_id: 10
+        port_binding: "static"
+      - name: "App_PortGroup"
+        vlan_id: 20
+        port_binding: "static"
+      - name: "DB_PortGroup"
+        vlan_id: 30
+        port_binding: "static"
+
+  tasks:
+    - name: "Abort if user did not confirm deletion"
+      fail:
+        msg: "Deletion aborted by user."
+      when: confirm_delete | lower != "yes"
+
+    - name: Debug vCenter connection
+      debug:
+        msg: "Deleting Distributed Switch '{{ vds_name }}' from vCenter {{ vcenter_hostname }}"
+
+    - name: "Check existing port groups (optional)"
+      community.vmware.vmware_dvs_portgroup_info:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: "{{ validate_certs }}"
+        datacenter: "{{ datacenter_name }}"
+        dvswitch: "{{ vds_name }}"
+      register: existing_portgroups
+      delegate_to: localhost
+
+    - name: "Delete Port Groups from Distributed Switch"
+      community.vmware.vmware_dvs_portgroup:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: "{{ validate_certs }}"
+        switch_name: "{{ vds_name }}"
+        portgroup_name: "{{ item.name }}"
+        port_binding: "{{ item.port_binding }}"
+        vlan_id: "{{ item.vlan_id }}"
+        state: absent
+      loop: "{{ port_groups }}"
+      when: "'portgroups' in existing_portgroups and item.name in existing_portgroups.portgroups | map(attribute='portgroup_name') | list"
+      delegate_to: localhost
+
+    - name: "Delete vSphere Distributed Switch"
+      community.vmware.vmware_dvswitch:
+        hostname: "{{ vcenter_hostname }}"
+        username: "{{ vcenter_username }}"
+        password: "{{ vcenter_password }}"
+        validate_certs: "{{ validate_certs }}"
+        datacenter_name: "{{ datacenter_name }}"
+        switch_name: "{{ vds_name }}"
+        state: absent
+      delegate_to: localhost
+
