@@ -1,0 +1,90 @@
+---
+- name: Prompt-based deployment of multiple VMs on vSphere
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_prompt:
+    - name: "num_vms"
+      prompt: "How many virtual machines would you like to create?"
+      private: no
+
+    - name: "vm_base_name"
+      prompt: "Enter base name for the VMs (e.g. web)"
+      private: no
+
+    - name: "base_ip"
+      prompt: "Enter starting IP address (e.g. 10.29.95.160)"
+      private: no
+
+  vars:
+    vcenter_server: "10.9.20.75"
+    vcenter_user: "administrator@penlabs.net"
+    vcenter_pass: "Pensando0$"
+    datacenter_name: "pod10-vcsa"
+    esxi_hostname: "10.9.23.217"
+    template_name: "ubu-linux-template-16gb"
+    vm_folder: "vm/ansible-vm"  # Make sure this exists in vCenter
+    datastore: "datastore-217-2"
+    network_name: "pod10-dvs-pvlan-2095"
+    vm_list: []
+
+  tasks:
+    - name: "Generate VM list dynamically"
+      set_fact:
+        vm_list: "{{ vm_list + [ {
+          'name': vm_base_name ~ '%02d' | format(item + 1),
+          'hostname': vm_base_name ~ '%02d' | format(item + 1),
+          'ip': base_ip.split('.')[:-1] | join('.') ~ '.' ~ ((base_ip.split('.')[-1] | int) + item) | string
+        } ] }}"
+      loop: "{{ range(0, num_vms | int) | list }}"
+      loop_control:
+        loop_var: item
+
+    - name: "OPTIONAL: Debug - List all VM folders"
+      community.vmware.vmware_folder_info:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        datacenter: "{{ datacenter_name }}"
+        validate_certs: false
+      register: folder_info
+      delegate_to: localhost
+
+    - name: "Debug folder list (optional)"
+      debug:
+        msg: "{{ folder_info.folders | map(attribute='path') | list }}"
+      when: folder_info is defined and 'folders' in folder_info
+
+    - name: "Deploy VMs from template"
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: false
+        name: "{{ item.name }}"
+        template: "{{ template_name }}"
+        datacenter: "{{ datacenter_name }}"
+        folder: "{{ vm_folder }}"
+        esxi_hostname: "{{ esxi_hostname }}"
+        datastore: "{{ datastore }}"
+        networks:
+          - name: "{{ network_name }}"
+            ip: "{{ item.ip }}"
+            netmask: 255.255.252.0
+            gateway: 10.9.23.254
+            type: static
+            dns_servers:
+              - 8.8.8.8
+          - name: "{{ network_name }}"
+            type: dhcp
+        customization:
+          hostname: "{{ item.hostname }}"
+          dns_servers:
+            - 8.8.8.8
+            - 10.9.20.7
+        state: poweredon
+        wait_for_ip_address: yes
+      loop: "{{ vm_list }}"
+      delegate_to: localhost
+
