@@ -1,0 +1,47 @@
+---
+- name: Remove multiple VMs from vSphere
+  hosts: localhost
+  gather_facts: no
+
+  vars_prompt:
+    - name: vm_names
+      prompt: "Enter the VM names to delete (comma-separated, e.g., web02,web03)"
+      private: no
+
+    - name: confirm_delete
+      prompt: "Are you sure you want to delete these VMs? (yes/no)"
+      private: no
+
+  vars:
+    vcenter_server: "10.9.20.75"
+    vcenter_user: "administrator@penlabs.net"
+    vcenter_pass: "Pensando0$"
+    datacenter_name: "pod10-vcsa"
+
+  tasks:
+    - name: Fail if user did not confirm
+      fail:
+        msg: "User cancelled deletion of VMs."
+      when: confirm_delete | lower != "yes"
+
+    - name: Convert comma-separated input into a list of VM dicts
+      set_fact:
+        vm_list: "{{ vm_names.split(',') | map('trim') | map('regex_replace', '^(.*)$', '{\"name\": \"\\1\"}') | map('from_yaml') | list }}"
+
+    - name: Show the list of VMs to be deleted
+      debug:
+        var: vm_list
+
+    - name: Delete VMs from vCenter
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_server }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: false
+        datacenter: "{{ datacenter_name }}"
+        name: "{{ item.name }}"
+        state: absent
+        force: yes
+      loop: "{{ vm_list }}"
+      delegate_to: localhost
+

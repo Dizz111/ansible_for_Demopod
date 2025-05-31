@@ -1,7 +1,22 @@
 ---
-- name: Deploy multiple VMs from template on vSphere
+- name: Prompt-based deployment of multiple VMs on vSphere
   hosts: localhost
+  connection: local
   gather_facts: no
+
+  vars_prompt:
+    - name: "num_vms"
+      prompt: "How many virtual machines would you like to create?"
+      private: no
+
+    - name: "vm_base_name"
+      prompt: "Enter base name for the VMs (e.g. web)"
+      private: no
+
+    - name: "base_ip"
+      prompt: "Enter starting IP address (e.g. 10.29.95.160)"
+      private: no
+
   vars:
     vcenter_server: "10.9.20.75"
     vcenter_user: "administrator@penlabs.net"
@@ -9,19 +24,23 @@
     datacenter_name: "pod10-vcsa"
     esxi_hostname: "10.9.23.217"
     template_name: "ubu-linux-template-16gb"
-    vm_folder: "vm/ansible-vm"  # This folder must exist under your chosen dataCenter in vCenter
+    vm_folder: "vm/ansible-vm"  # Make sure this exists in vCenter
     datastore: "datastore-217-2"
     network_name: "pod10-dvs-pvlan-2095"
-
-    vm_list:
-      - name: web02
-        ip: 10.29.95.160
-        hostname: web02
-      - name: web03
-        ip: 10.29.95.161
-        hostname: web03
+    vm_list: []
 
   tasks:
+    - name: "Generate VM list dynamically"
+      set_fact:
+        vm_list: "{{ vm_list + [ {
+          'name': vm_base_name ~ '%02d' | format(item + 1),
+          'hostname': vm_base_name ~ '%02d' | format(item + 1),
+          'ip': base_ip.split('.')[:-1] | join('.') ~ '.' ~ ((base_ip.split('.')[-1] | int) + item) | string
+        } ] }}"
+      loop: "{{ range(0, num_vms | int) | list }}"
+      loop_control:
+        loop_var: item
+
     - name: "OPTIONAL: Debug - List all VM folders"
       community.vmware.vmware_folder_info:
         hostname: "{{ vcenter_server }}"
@@ -34,8 +53,8 @@
 
     - name: "Debug folder list (optional)"
       debug:
-        var: folder_info
-      when: folder_info is defined
+        msg: "{{ folder_info.folders | map(attribute='path') | list }}"
+      when: folder_info is defined and 'folders' in folder_info
 
     - name: "Deploy VMs from template"
       community.vmware.vmware_guest:
@@ -57,6 +76,8 @@
             type: static
             dns_servers:
               - 8.8.8.8
+          - name: "{{ network_name }}"
+            type: dhcp
         customization:
           hostname: "{{ item.hostname }}"
           dns_servers:
